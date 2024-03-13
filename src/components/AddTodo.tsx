@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from "react";
-
-function InputDiv({ addTodoData }: { addTodoData: (title: string, description: string) => void }) {
+import { useNavigate } from "react-router-dom";
+import {getCurrentDateString} from "../utilityFunctions"
+function AddTodo() {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [isSubmited, setIsSubmited] = useState(false);
     const [error, setError] = useState<string>("")
+    const [selectedDate, setDate] = useState("")
 
+    const navigate = useNavigate()
+    
     const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setTitle(event.target.value);
         setIsSubmited(false)
@@ -18,6 +22,14 @@ function InputDiv({ addTodoData }: { addTodoData: (title: string, description: s
         setError("")
     }
 
+    const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setDate(event.target.value);
+        console.log(event.target.value);
+        console.log(new Date(event.target.value));
+        
+    }
+
+
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         fetch("http://localhost:8000/todos",
@@ -26,6 +38,7 @@ function InputDiv({ addTodoData }: { addTodoData: (title: string, description: s
                 body: JSON.stringify({
                     title,
                     description,
+                    selectedDate,
                 }),
             }
         )
@@ -33,16 +46,18 @@ function InputDiv({ addTodoData }: { addTodoData: (title: string, description: s
             .then(response => {
                 console.log(response);
                 setError("");
-                setIsSubmited(true)
+                setIsSubmited(true);
+                navigate("/");
             })
             .catch(error => setError(error))
 
-        
-        addTodoData(title, description);
+
+        // addTodoData(title, description);
         setTitle("");
         setDescription("");
     }
 
+    
     return (
         <div className="h-25 container-lg mx-auto bg-slate-800 flex justify-center items-center">
             <form className="flex flex-col items-center" onSubmit={handleSubmit}>
@@ -59,6 +74,15 @@ function InputDiv({ addTodoData }: { addTodoData: (title: string, description: s
 
                 <label htmlFor="description" className="sr-only">Enter Todo Description</label>
                 <input
+                    id="date"
+                    type="date"
+                    required
+                    value={selectedDate}
+                    onChange={handleDateChange}
+                    min={getCurrentDateString()}
+                    className="placeholder-italic placeholder-slate-400 text-black rounded-md h-10 p-2 w-full m-2"
+                />
+                <input
                     id="description"
                     type="text"
                     required
@@ -67,14 +91,13 @@ function InputDiv({ addTodoData }: { addTodoData: (title: string, description: s
                     onChange={handleDescriptionChange}
                     className="placeholder-italic placeholder-slate-400 text-black rounded-md h-10 p-2 w-full m-2"
                 />
-
                 {isSubmited && <div className="text-green-500">Submited data successfully</div>}
                 {error && <div className="text-red-500"   >Internal Server Error</div>}
                 <button type="submit" className="w-20 m-2 bg-green-400 rounded-md h-10 p-2 ml-2">+ Todo</button>
-                
+
             </form>
         </div>
     )
 }
 
-export default InputDiv;
+export default AddTodo;
