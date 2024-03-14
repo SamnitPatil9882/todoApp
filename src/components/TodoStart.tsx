@@ -1,30 +1,93 @@
 import { useEffect, useState, ChangeEvent } from "react";
 import useFetch from "../hooks/useFetch";
-import todoInfo, { DropdownFilter, Order } from "../models/todoItem";
+import todoInfo, {
+  DropdownFilter,
+  Order,
+  responsePageingation,
+} from "../models/todoItem";
 import TodoList from "./TodoList";
 import { set } from "date-fns";
 import ascending from "../assets/ascending.svg";
 import SearchBox from "./SearchBox";
-import { isValidDate } from "../utilityFunctions";
-
+import {
+  deleteTodo,
+  fetchTodos,
+  isValidDate,
+  updateTodo,
+} from "../utilityFunctions";
+import { QueryClient, useMutation, useQuery } from "@tanstack/react-query";
+const queryClient = new QueryClient();
 const TodoStart = () => {
-  const {
-    data: todoArr,
-    ispending: pending,
-    error,
-    refetch,
-    setData,
-    setError,
-  } = useFetch<todoInfo[]>("http://localhost:8000/todos");
-
   const [completedTodo, setCompletedTodo] = useState<todoInfo[]>([]);
   const [incompletedTodo, setInCompletedTodo] = useState<todoInfo[]>([]);
-  const [showCompleted, setShowCompleted] = useState(false);
   const [order, setOrder] = useState<Order>(Order.asc);
+  const [todoArr, setTodoArr] = useState<todoInfo[]>([]);
   const [selectedOption, setSelectedOption] = useState<DropdownFilter>(
     DropdownFilter.date
   );
-  const [filteredDate, setFilterDate] = useState<string>('');
+  const [filteredDate, setFilterDate] = useState<string>("");
+  const [page, setPage] = useState<number>(1);
+  const [pageCount, setPageCount] = useState<number>(1)
+  const per_page = 2;
+
+  const {
+    data: responseData,
+    // isFetched: pending,
+    isFetching: pending,
+    error,
+    refetch,
+    isSuccess,
+  } = useQuery({
+    queryKey: ["todosData"],
+    queryFn: () => fetchTodos({ page, per_page }),
+  });
+
+  console.log("RESPONSE: ", responseData);
+  // console.log("pendiing: ", pending);
+  // console.log("isSuccess: ", isSuccess);
+  // console.log("todoArr: ", todoArr);
+  // setTodoArr(responseData?.data!)
+
+  useEffect(() => {
+    // console.log("responseData useEffect3 : " + responseData);
+
+    if (isSuccess && responseData) {
+      console.log(
+        "************************ responseData : " , responseData
+      );
+      
+      setTodoArr(responseData.data);
+      setPageCount(Math.ceil(Number(responseData.headers.get("x-total-count"))/per_page));
+
+    }
+  }, [responseData, isSuccess]);
+
+  // let pageCount = 1;
+  // pageCount = responseData?.pages!;
+
+  const { mutate: delTodo } = useMutation({
+    mutationFn: deleteTodo,
+    mutationKey: ["deleteTodo"],
+    onSuccess: () => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["todosData"], exact: true });
+    },
+  });
+
+  const { mutate: upTodo } = useMutation({
+    mutationFn: updateTodo,
+    mutationKey: ["updateTodo"],
+    onSuccess: (id) => {
+      console.log({ id });
+      refetch();
+      // setTimeout(()=>{queryClient.invalidateQueries({ queryKey: ['todosData'],exact: true ,refetchType: 'active',});},1000)
+      queryClient.invalidateQueries({
+        queryKey: ["todosData"],
+        exact: true,
+        refetchType: "active",
+      });
+    },
+  });
 
   const sortTodo = (
     todoArray: todoInfo[],
@@ -46,7 +109,6 @@ const TodoStart = () => {
         );
         break;
       default:
-        // No sorting needed if the dropdown filter is not title or date
         sortedArray = todoArray;
         break;
     }
@@ -55,7 +117,6 @@ const TodoStart = () => {
 
   const handleDropdownChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const newSelectedOption = event.target.value as DropdownFilter;
-    console.log(newSelectedOption);
     setSelectedOption(newSelectedOption);
     if (newSelectedOption === DropdownFilter.date) {
       const sortedCompletedTodoArr = [...completedTodo].sort((a, b) => {
@@ -93,79 +154,56 @@ const TodoStart = () => {
   };
 
   function setTodoData() {
-    console.log("set todo data");
-  
-    if (todoArr) {
+    // console.log("set todo data: ", responseData);
+    refetch();
+    if (Array.isArray(todoArr)) {
       // Sort the todoArr array based on the selectedOption
       const sortedTodoArr = [...todoArr].sort((a, b) => {
         const aValue = a[selectedOption as keyof todoInfo];
         const bValue = b[selectedOption as keyof todoInfo];
-  
+
         if (typeof aValue === "string" && typeof bValue === "string") {
           return aValue.localeCompare(bValue);
         } else {
-          // Handle the case where the selected property is not a string or doesn't exist
-          // You might want to provide a default behavior or sorting logic here
           return 0;
         }
       });
-  
-      // Filter the sorted todoArr based on completion status
+
       const completed = sortedTodoArr.filter(
         (todo) =>
           todo.isCompleted &&
-          (!filteredDate || new Date(filteredDate).getTime() === new Date(todo.selectedDate).getTime())
+          (!filteredDate ||
+            new Date(filteredDate).getTime() ===
+              new Date(todo.selectedDate).getTime())
       );
       const incompleted = sortedTodoArr.filter(
         (todo) =>
           !todo.isCompleted &&
-          (!filteredDate || new Date(filteredDate).getTime() === new Date(todo.selectedDate).getTime())
+          (!filteredDate ||
+            new Date(filteredDate).getTime() ===
+              new Date(todo.selectedDate).getTime())
       );
-  
-      // Set the state with the sorted and filtered arrays
+
       setCompletedTodo(completed);
       setInCompletedTodo(incompleted);
-  
-      console.log("Completed todo: ", completed);
-      console.log("Incompleted todo: ", incompleted);
     }
   }
-  
 
   const checkChanges = (id: number, isCompleted: boolean) => {
-    fetch(`http://localhost:8000/todos/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        isCompleted: !isCompleted,
-      }),
-    }).then((response) => refetch());
+    upTodo({ id, isCompleted });
+    refetch();
   };
 
   const handleDelete = (id: number) => {
-    fetch(`http://localhost:8000/todos/${id}`, {
-      method: "DELETE",
-    })
-      .then((response) => response.json())
-      .then((response) => refetch());
+    delTodo(id);
+    refetch();
   };
-
-  // const handleSelectChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  //   setShowCompleted(!showCompleted);
-  //   console.log(showCompleted);
-  //   if (!showCompleted) {
-  //     setData(todoArr?.filter((value) => value.isCompleted == true));
-  //   } else {
-  //     refetch();
-  //   }
-  // };
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const searchTerm = event.target.value;
     console.log(searchTerm);
 
     if (todoArr) {
-      console.log("intodoArr");
-
       const filteredCompletedTodo = todoArr.filter(
         (todo) => todo.isCompleted && todo.title.includes(searchTerm)
       );
@@ -245,42 +283,46 @@ const TodoStart = () => {
     }
   };
 
-  const selectedFilterDate = () => {};
-
-  const handleFilterDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilterDateChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const inputDate = event.target.value;
-      setFilterDate(inputDate.toString());
-    
+    setFilterDate(inputDate.toString());
   };
-  useEffect(setTodoData, [todoArr, filteredDate]);
+
+  const handlePrevChange = () => {
+    setPage(page == 1 ? page : page - 1);
+    refetch();
+  };
+
+  const handleNextChange = () => {
+    if (page < pageCount) {
+      setPage(page + 1);
+    }
+
+    refetch();
+  };
+  // console.log("responseData useEffect1 : " + responseData);
+  useEffect(setTodoData, [page, todoArr, filteredDate]);
+  // console.log("responseData useEffect2 : " + responseData);
+
   console.log("HERE");
 
   return (
     <div>
-      {/* <div className="w-full flex flex-col items-center ">
-        <div className="flex flex-row items-center ">
-          <input
-            type="checkbox"
-            className="w-6 h-6 checked:bg-blue-500 p-0 m-0"
-            onChange={(e) => {
-              handleSelectChange(e);
-            }}
-          />
-          <label htmlFor="">Show Completed</label>
-        </div>
-      </div> */}
-
       {pending && (
         <div className="w-full flex flex-col items-center ">
           Wait a moment Data is loading...
         </div>
       )}
+
       {error && (
         <div className="w-full flex flex-col items-center ">
           Something went wrong!
         </div>
       )}
-      {todoArr && (
+
+      {responseData && (
         <div className="w-full h-full flex flex-col">
           <SearchBox
             handleOrderChange={handleOrderChange}
@@ -288,11 +330,13 @@ const TodoStart = () => {
             order={order}
             selectedOption={selectedOption}
             handleDropdownChange={handleDropdownChange}
-            // filteredDate={filteredDate}
-            // setFilteredDate={setFilterDate}
-            // selectedFilterDate={selectedFilterDate}
             handleFilterDateChange={handleFilterDateChange}
           />
+          <div className="flex flex-row">
+            <button onClick={handlePrevChange}>Prev</button>
+            {page}of{pageCount}
+            <button onClick={handleNextChange}>Next</button>
+          </div>
           <div className="flex flex-row">
             <div className="w-1/2 border m-2 shadow">
               {<h1>InComplete todo</h1>}
@@ -315,6 +359,7 @@ const TodoStart = () => {
           </div>
         </div>
       )}
+      {/* loading..... */}
 
       <div>
         <div
@@ -359,3 +404,5 @@ const TodoStart = () => {
 };
 
 export default TodoStart;
+
+// const res = await axios.get(`http://localhost:5000/todos?_page=${page}&_limit=${limit}&title_like=${search}&_sort=title&_order=${order}&isCompleted_like=${todoStatus}`);

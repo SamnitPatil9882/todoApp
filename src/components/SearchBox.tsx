@@ -9,8 +9,6 @@ function SearchBox({
   order,
   selectedOption,
   handleDropdownChange,
-  // filteredDate,
-  // setFilteredDate,
   handleFilterDateChange
 }: {
   handleSearchChange: Function;
@@ -18,11 +16,7 @@ function SearchBox({
   order: Order;
   selectedOption: DropdownFilter;
   handleDropdownChange: (event: ChangeEvent<HTMLSelectElement>) => void;
-  // filteredDate:Date;
-  // // setFilteredDate:Function;
-  handleFilterDateChange: (event: ChangeEvent<HTMLInputElement>) => void;
-
-  
+  handleFilterDateChange: (event: ChangeEvent<HTMLInputElement>) => void; 
 }) {
   
   return (
@@ -51,13 +45,14 @@ function SearchBox({
           <img className="w-5" src={descending} alt="Descending" />
         )}
       </button>
-      <div className="ml-2 w-5">
+      <div className="m-2">
         <select value={selectedOption} onChange={handleDropdownChange}>
           <option value="title">{DropdownFilter.title}</option>
           <option value="date">{DropdownFilter.date}</option>
         </select>
       </div>
       <div>
+        
       <input
           id="date"
           type="date"

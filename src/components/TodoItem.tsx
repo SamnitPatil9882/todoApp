@@ -29,7 +29,7 @@ function TodoItem(props: {
             className="w-6 h-6 checked:bg-blue-500 p-0 m-0"
             checked={props.todoItem.isCompleted}
             onChange={() => {
-              props.checkChanges(props.todoItem.id, props.todoItem.isCompleted);
+              props.checkChanges(props.todoItem.id, !props.todoItem.isCompleted);
             }}
           />
           <div
