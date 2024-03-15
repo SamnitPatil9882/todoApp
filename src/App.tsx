@@ -7,6 +7,8 @@ import FomikForm from './components/FormikForm';
 // import { QueryClient, QueryClientProvider } from '@tanstack/react-query-devtools';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import CounterOne from './components/CounterOne';
+import DataFetching from './components/DataFetching';
 
 const queryClient = new QueryClient;
 function App() {
@@ -14,6 +16,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TodoApp/>
       {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+      {/* <CounterOne /> */}
+      {/* <DataFetching /> */}
     </QueryClientProvider>
   );
 }

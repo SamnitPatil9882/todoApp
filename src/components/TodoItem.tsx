@@ -7,7 +7,6 @@ function TodoItem(props: {
   checkChanges: (id: number, isChecked: boolean) => void;
   handleDelete: (id: number) => void;
 }) {
-  // console.log("todoItem: ", props.todoItem);
   const navigate = useNavigate();
   const handleNavigate = (id: number) => {
     navigate("/todo/" + id);
@@ -29,6 +28,10 @@ function TodoItem(props: {
             className="w-6 h-6 checked:bg-blue-500 p-0 m-0"
             checked={props.todoItem.isCompleted}
             onChange={() => {
+              console.log("props compleed: ",props.todoItem.isCompleted);
+              console.log("props compleed : : ",!props.todoItem.isCompleted);
+              
+              
               props.checkChanges(props.todoItem.id, !props.todoItem.isCompleted);
             }}
           />

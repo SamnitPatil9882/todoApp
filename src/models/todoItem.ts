@@ -31,4 +31,23 @@ export interface responsePageingation {
   pages: number;
   prev?: number;
 }
+
+export interface todoFetchResponse{
+  data: todoInfo[];
+  headers: any
+}
+
+export interface todoResponse{
+  todoArr: todoInfo[],
+  pending: boolean,
+  error:string,
+  refetch:boolean,
+  isSuccess:boolean,
+  order:Order,
+  fileterDate:string,
+  page:number,
+  pageCount:number,
+  per_page:number,
+  selectedOption:DropdownFilter,
+}
 export default todoInfo;

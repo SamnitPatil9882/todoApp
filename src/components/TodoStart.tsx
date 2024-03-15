@@ -1,76 +1,61 @@
-import { useEffect, useState, ChangeEvent } from "react";
-import useFetch from "../hooks/useFetch";
-import todoInfo, {
-  DropdownFilter,
-  Order,
-  responsePageingation,
-} from "../models/todoItem";
+import { useEffect, useState, ChangeEvent, useReducer } from "react";
+import todoInfo, { DropdownFilter, Order, todoFetchResponse, todoResponse } from "../models/todoItem";
 import TodoList from "./TodoList";
-import { set } from "date-fns";
-import ascending from "../assets/ascending.svg";
 import SearchBox from "./SearchBox";
-import {
-  deleteTodo,
-  fetchTodos,
-  isValidDate,
-  updateTodo,
-} from "../utilityFunctions";
+import { deleteTodo, fetchTodos, updateTodo } from "../utilityFunctions";
 import { QueryClient, useMutation, useQuery } from "@tanstack/react-query";
+import { todoReducer } from "../models/reducers";
+import { Action } from "@remix-run/router";
 const queryClient = new QueryClient();
+
+
+const initialState: todoResponse = {
+  todoArr: [],
+  pending: false,
+  error:"",
+  refetch:false,
+  isSuccess:true,
+  order:Order.asc,
+  fileterDate:"",
+  page:1,
+  pageCount:1,
+  per_page:2,
+  selectedOption:DropdownFilter.title,
+};
+
 const TodoStart = () => {
   const [completedTodo, setCompletedTodo] = useState<todoInfo[]>([]);
   const [incompletedTodo, setInCompletedTodo] = useState<todoInfo[]>([]);
-  const [order, setOrder] = useState<Order>(Order.asc);
-  const [todoArr, setTodoArr] = useState<todoInfo[]>([]);
-  const [selectedOption, setSelectedOption] = useState<DropdownFilter>(
-    DropdownFilter.date
-  );
   const [filteredDate, setFilterDate] = useState<string>("");
-  const [page, setPage] = useState<number>(1);
-  const [pageCount, setPageCount] = useState<number>(1)
-  const per_page = 2;
 
-  const {
-    data: responseData,
-    // isFetched: pending,
-    isFetching: pending,
-    error,
-    refetch,
-    isSuccess,
-  } = useQuery({
-    queryKey: ["todosData"],
-    queryFn: () => fetchTodos({ page, per_page }),
-  });
+  const [{todoArr,page,pageCount,per_page,isSuccess,error,pending,refetch,selectedOption,order},dispatch] = useReducer(todoReducer,initialState);
 
-  console.log("RESPONSE: ", responseData);
-  // console.log("pendiing: ", pending);
-  // console.log("isSuccess: ", isSuccess);
-  // console.log("todoArr: ", todoArr);
-  // setTodoArr(responseData?.data!)
-
+  console.log("todoData: ",{todoArr,page,pageCount,per_page,isSuccess,error,pending,refetch});
+  
   useEffect(() => {
-    // console.log("responseData useEffect3 : " + responseData);
+    const fetchData = async () => {
+      try {
+        const response= await fetchTodos({ page, per_page });
+        console.log("response",response.data);
+        
+        dispatch({ type: "FETCH_SUCCESS", payload: response.data });
+        dispatch({ type: "SET_PAGE_COUNT", payload:Math.ceil(Number(response.headers.get("x-total-count"))/per_page)})
 
-    if (isSuccess && responseData) {
-      console.log(
-        "************************ responseData : " , responseData
-      );
-      
-      setTodoArr(responseData.data);
-      setPageCount(Math.ceil(Number(responseData.headers.get("x-total-count"))/per_page));
+      } catch (error) {
+        dispatch({ type: "FETCH_ERROR" });
+      }
+    };
 
-    }
-  }, [responseData, isSuccess]);
+    fetchData(); 
+  }, [ page, per_page,pending]);
 
-  // let pageCount = 1;
-  // pageCount = responseData?.pages!;
 
   const { mutate: delTodo } = useMutation({
     mutationFn: deleteTodo,
     mutationKey: ["deleteTodo"],
     onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["todosData"], exact: true });
+      dispatch({ type: "REFETCH" });
+      queryClient.invalidateQueries({ queryKey: ["todosData"], exact: true }); 
     },
   });
 
@@ -78,9 +63,8 @@ const TodoStart = () => {
     mutationFn: updateTodo,
     mutationKey: ["updateTodo"],
     onSuccess: (id) => {
-      console.log({ id });
-      refetch();
-      // setTimeout(()=>{queryClient.invalidateQueries({ queryKey: ['todosData'],exact: true ,refetchType: 'active',});},1000)
+      console.log({ id }); 
+      dispatch({ type: "REFETCH" });
       queryClient.invalidateQueries({
         queryKey: ["todosData"],
         exact: true,
@@ -117,8 +101,10 @@ const TodoStart = () => {
 
   const handleDropdownChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const newSelectedOption = event.target.value as DropdownFilter;
-    setSelectedOption(newSelectedOption);
+    dispatch({type: "SORT_BY", payload:newSelectedOption})
     if (newSelectedOption === DropdownFilter.date) {
+      console.log("filter: date: ",newSelectedOption," : ",order);
+      
       const sortedCompletedTodoArr = [...completedTodo].sort((a, b) => {
         const dateA = new Date(a.selectedDate).getTime();
         const dateB = new Date(b.selectedDate).getTime();
@@ -134,6 +120,7 @@ const TodoStart = () => {
       setCompletedTodo(sortedCompletedTodoArr);
       setInCompletedTodo(sortedIncompleteTodoArr);
     } else {
+      console.log("filter: title: ",newSelectedOption," : ",order);
       const sortedCompletedTodoArr = [...completedTodo].sort((a, b) =>
         a.title.localeCompare(b.title)
       );
@@ -154,10 +141,9 @@ const TodoStart = () => {
   };
 
   function setTodoData() {
-    // console.log("set todo data: ", responseData);
-    refetch();
+    // refetch();
+    // dispatch({type:"REFETCH"})
     if (Array.isArray(todoArr)) {
-      // Sort the todoArr array based on the selectedOption
       const sortedTodoArr = [...todoArr].sort((a, b) => {
         const aValue = a[selectedOption as keyof todoInfo];
         const bValue = b[selectedOption as keyof todoInfo];
@@ -191,12 +177,10 @@ const TodoStart = () => {
 
   const checkChanges = (id: number, isCompleted: boolean) => {
     upTodo({ id, isCompleted });
-    refetch();
   };
 
   const handleDelete = (id: number) => {
     delTodo(id);
-    refetch();
   };
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,6 +210,7 @@ const TodoStart = () => {
   };
 
   const handleOrderChange = () => {
+
     if (order === Order.asc) {
       if (selectedOption === DropdownFilter.title) {
         const sortedCompletedTodoArr = [...completedTodo].sort((a, b) =>
@@ -250,7 +235,8 @@ const TodoStart = () => {
         setCompletedTodo(sortedCompletedTodoArr);
         setInCompletedTodo(sortedIncompleteTodoArr);
       }
-      setOrder(Order.desc);
+      // setOrder(Order.desc);
+      dispatch({type: "SET_ORDER",payload:Order.desc})
     } else {
       if (selectedOption === DropdownFilter.title) {
         const sortedCompletedTodoArr = [...completedTodo]
@@ -279,7 +265,8 @@ const TodoStart = () => {
         setCompletedTodo(sortedCompletedTodoArr);
         setInCompletedTodo(sortedIncompleteTodoArr);
       }
-      setOrder(Order.asc);
+      // setOrder(Order.asc);
+      dispatch({type: "SET_ORDER",payload:Order.asc})
     }
   };
 
@@ -291,20 +278,22 @@ const TodoStart = () => {
   };
 
   const handlePrevChange = () => {
-    setPage(page == 1 ? page : page - 1);
-    refetch();
+    // setPage(page == 1 ? page : page - 1);
+    page == 1 ? dispatch({type: "SET_PAGE", payload:1}) : dispatch({type: "SET_PAGE", payload:page - 1});
+    
+    // refetch();
+    dispatch({type:"REFETCH"})
   };
 
   const handleNextChange = () => {
     if (page < pageCount) {
-      setPage(page + 1);
+      dispatch({type: "SET_PAGE", payload:page + 1})
     }
 
-    refetch();
+    // refetch();
+    dispatch({type:"REFETCH"})
   };
-  // console.log("responseData useEffect1 : " + responseData);
   useEffect(setTodoData, [page, todoArr, filteredDate]);
-  // console.log("responseData useEffect2 : " + responseData);
 
   console.log("HERE");
 
@@ -322,7 +311,7 @@ const TodoStart = () => {
         </div>
       )}
 
-      {responseData && (
+      {todoArr && (
         <div className="w-full h-full flex flex-col">
           <SearchBox
             handleOrderChange={handleOrderChange}
@@ -359,50 +348,8 @@ const TodoStart = () => {
           </div>
         </div>
       )}
-      {/* loading..... */}
-
-      <div>
-        <div
-          id="popup-modal"
-          tabIndex={-1}
-          className="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full"
-        >
-          <div className="relative p-4 w-full max-w-md max-h-full">
-            <div className="relative bg-white rounded-lg shadow dark:bg-gray-700">
-              <button
-                type="button"
-                className="absolute top-3 end-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-                data-modal-hide="popup-modal"
-              >
-                <span className="sr-only">Close modal</span>
-              </button>
-              <div className="p-4 md:p-5 text-center">
-                <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-                  Are you sure you want to delete this product?
-                </h3>
-                <button
-                  data-modal-hide="popup-modal"
-                  type="button"
-                  className="text-white bg-red-600 hover:bg-red-800 focus:ring-4 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center"
-                >
-                  Yes, I'm sure
-                </button>
-                <button
-                  data-modal-hide="popup-modal"
-                  type="button"
-                  className="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
-                >
-                  No, cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
 
 export default TodoStart;
-
-// const res = await axios.get(`http://localhost:5000/todos?_page=${page}&_limit=${limit}&title_like=${search}&_sort=title&_order=${order}&isCompleted_like=${todoStatus}`);

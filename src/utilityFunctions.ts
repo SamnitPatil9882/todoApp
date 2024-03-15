@@ -27,7 +27,7 @@ export function isValidDate(dateString: string) {
 export const fetchTodos = async ({page,per_page}:{page:number,per_page:number}) => {
   const response = await fetch(`http://localhost:8000/todos?_page=${page}&_limit=${per_page}`);
   console.log(response.headers.get('x-total-count'))
-  const data = await response.json();
+  const data:todoInfo[] = await response.json();
   
   return {data , headers:response.headers};
 };
@@ -60,33 +60,41 @@ export const deleteTodo = async (id: number) => {
     const response = await fetch(`http://localhost:8000/todos/${id}`, {
       method: "DELETE",
     });
+
     if (!response.ok) {
-      throw new Error("Failed to update todo");
+      throw new Error("Failed to delete todo");
     }
 
-    return response.json();
+    return response.json(); // Return parsed response data if needed
   } catch (error) {
     // Handle any errors here, such as logging or re-throwing
-    console.error("Error updating todo:", error);
+    console.error("Error deleting todo:", error);
     throw error;
   }
+};
 
-  };
 
-export const updateTodo = async ({id,isCompleted}:{id: number, isCompleted: boolean}): Promise<any> => {
+export const updateTodo = async ({ id, isCompleted }: { id: number; isCompleted: boolean }) => {
   try {
     const response = await fetch(`http://localhost:8000/todos/${id}`, {
       method: "PATCH",
       body: JSON.stringify({
-        isCompleted: isCompleted,
+        isCompleted,
       }),
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
 
     if (!response.ok) {
       throw new Error("Failed to update todo");
     }
 
-    return response.json();
+    const responseData = await response.json(); // Parse response data
+
+    console.log("update: completed: ", isCompleted, " : ", responseData);
+
+    return responseData; // Return parsed response data
   } catch (error) {
     // Handle any errors here, such as logging or re-throwing
     console.error("Error updating todo:", error);
